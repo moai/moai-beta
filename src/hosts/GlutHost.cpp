@@ -34,6 +34,10 @@
 	#include <GLUT/glut.h>
 #endif
 
+#ifdef _WINHOSTEXT
+	#include "FolderWatcher.h"
+#endif
+
 namespace GlutInputDeviceID {
 	enum {
 		DEVICE,
@@ -168,6 +172,10 @@ static void _onTimer ( int millisec ) {
 	#ifdef AKUGLUT_USE_FMOD
 		AKUFmodUpdate ();
 	#endif
+
+	#ifdef _WINHOSTEXT
+		winhostext_Query();
+	#endif
 	
 	glutPostRedisplay ();
 }
@@ -246,6 +254,9 @@ static void _cleanup () {
 	// don't call this on windows; atexit conflict with untz
 	// possible to fix?
 	//AKUClearMemPool ();
+	#ifdef _WINHOSTEXT		
+		winhostext_CleanUp();
+	#endif
 }
 
 //----------------------------------------------------------------//
@@ -301,6 +312,11 @@ int GlutHost ( int argc, char** argv ) {
 	for ( int i = 1; i < argc; ++i ) {
 		AKURunScript ( argv [ i ]);
 	}
+
+	#ifdef _WINHOSTEXT
+		//assuming that the last script is the entry point we only watch for that directory
+		winhostext_WatchFolder(argv[argc - 1]);
+	#endif
 	
 	if ( sHasWindow ) {
 		glutTimerFunc ( 0, _onTimer, 0 );
