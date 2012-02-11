@@ -4,19 +4,23 @@
 #include <FolderWatcher.h>
 #include <aku/AKU.h>
 
-#define SIZE 64
+const int _SIZE = 1024;
 
 struct FileInfo {
 	FILETIME lastwrite;
-	const char * fileName;
+	char * fileName;
 	bool shouldDelete;
 };
 
-unsigned int ptr = 0;
-struct FileInfo * filesInfo[SIZE];
-const char * directoryPath;
+struct DirInfo {
+	HANDLE notifyHandle;
+	const char * dir;
+};
+
+static struct FileInfo * filesInfo[_SIZE];
+const char * baseDirectoryPath;
 const char * directoryQueryString;
-HANDLE notifyHandle;
+static struct DirInfo * notifyHandles[_SIZE];
 
 //-------- Utility Functions -----------//
 
@@ -38,31 +42,29 @@ static size_t findLastOccuranceOfDirectorySeparator(const char * path) {
 	return 0;
 }
 
-static void createDirectoryQueryString(const char * startupScript) {
-	size_t dirPathSize = findLastOccuranceOfDirectorySeparator(startupScript);
+static const char *  createDirectoryQueryString(const char * fullFileName) {
+	size_t dirPathSize = findLastOccuranceOfDirectorySeparator(fullFileName);
 
 	char * temp = (char *) calloc(dirPathSize+3,sizeof(char));
-	strncpy(temp,startupScript,dirPathSize);
+	strncpy(temp,fullFileName,dirPathSize);
 	temp[dirPathSize] = '\\';
 	temp[dirPathSize+1] = '*';
 	temp[dirPathSize+2] = '\0';
-	directoryQueryString = (const char *) temp;
-
-	temp = (char *) calloc(dirPathSize+1,sizeof(char));
-	strncpy(temp,startupScript,dirPathSize);
-	directoryPath = (const char *) temp;
+	return temp;
 }
 
-static int findFilePosition(WIN32_FIND_DATA * fileData,int * pos) {
+static int findFilePosition(const char * fileName,int * pos) {
 	int markFreeOne = -1;
-	for(unsigned int i=0; i < SIZE; i++) {
+	for(unsigned int i=0; i < _SIZE; i++) {
 		if (filesInfo[i] != NULL) {
-			if (strcmp(filesInfo[i]->fileName,fileData->cFileName) == 0) {
+			if (strcmp(filesInfo[i]->fileName,fileName) == 0) {
 				*pos = i;
 				return false;
 			}
 		} else if(markFreeOne == -1) {
 			markFreeOne = i;
+		} else {
+			break;
 		}
 	}
 
@@ -71,12 +73,24 @@ static int findFilePosition(WIN32_FIND_DATA * fileData,int * pos) {
 	return true;
 }
 
-static const char * fullPathOf(const char * fileName) {
-	char * fullPath = (char *) calloc(strlen(directoryPath) + strlen(fileName) + 2,sizeof(char));
-	size_t diretoryPathSize = strlen(directoryPath);
-	strcpy(fullPath,directoryPath);
-	fullPath[diretoryPathSize] = '\\';
-	strcpy(fullPath + strlen(directoryPath) + 1,fileName);
+static const char * concatDirAndFileName(const char * dir,const char * file,bool trailingSlash) {
+	size_t fileSize = strlen(file);
+	size_t directoryPathSize = strlen(dir);
+	size_t extraSize = 1;
+
+	if (trailingSlash)
+		extraSize++;
+
+	size_t fullPathSize = directoryPathSize + fileSize + extraSize;
+	char * fullPath = (char *) calloc(fullPathSize,sizeof(char));
+	strcpy(fullPath,dir);
+
+	strcpy(fullPath + directoryPathSize,file);
+	
+	if(trailingSlash) {
+		fullPath[fullPathSize-2] = '\\';
+		fullPath[fullPathSize-1] = '\0';
+	}
 	return (const char *)fullPath;
 }
 //------------------------------------//
@@ -87,113 +101,157 @@ static void deleteFileInfoOnPos(int pos) {
 }
 
 static void markAllForDeletion() {
-	for(unsigned int i=0; i < SIZE; i++) {
+	for(unsigned int i=0; i < _SIZE; i++) {
 		if (filesInfo[i] != NULL)
 			filesInfo[i]->shouldDelete = true;
 	}
 }
 
 static void deleteAllMarked() {
-	for(unsigned int i=0; i < SIZE; i++) {
+	for(unsigned int i=0; i < _SIZE; i++) {
 		if (filesInfo[i] != NULL && filesInfo[i]->shouldDelete) 
 			deleteFileInfoOnPos(i);
 	}
 }
 
-static void reloadLuaFile(const char * fileName) {
-	const char * fullPath = fullPathOf(fileName);
-	AKURunScript(fullPath);
-	free((void*)fullPath);
+static void reloadLuaFile(const char * file) {
+	AKURunScript(file);
+	printf("%s reloaded.\n",file);
 }
 
-static void newFileInfoOnPos(WIN32_FIND_DATA * newLuaFile,int pos) {
+static void newFileInfoOnPos(const char * fileName,WIN32_FIND_DATA * newLuaFile,int pos) {
 	if (filesInfo[pos] == NULL) {
 		filesInfo[pos] = (struct FileInfo *) malloc(sizeof(struct FileInfo));
-		filesInfo[pos]->fileName = (const char *) calloc(sizeof(char),MAX_PATH);
+		filesInfo[pos]->fileName = (char *) calloc(sizeof(char),MAX_PATH);
 	}
 
 	filesInfo[pos]->shouldDelete = false;
 	filesInfo[pos]->lastwrite = newLuaFile->ftLastWriteTime;
-	strcpy((char *)filesInfo[pos]->fileName,newLuaFile->cFileName);
+	strcpy(filesInfo[pos]->fileName,fileName);
 }
 
-static void listProjectDirectory() {
+static void watchDirectory(const char * dir) {
+
+	for (int i=0;  i<_SIZE; i++) {
+		if (notifyHandles[i] != NULL) {
+			if (!strcmp(dir,notifyHandles[i]->dir))
+				break;
+		} else {
+			notifyHandles[i] = (struct DirInfo *)malloc(sizeof(struct DirInfo));
+			notifyHandles[i]->dir = (const char*)calloc(strlen(dir),sizeof(char));
+			strcpy((char*)notifyHandles[i]->dir,dir);
+			notifyHandles[i]->notifyHandle = FindFirstChangeNotification(dir,false,FILE_NOTIFY_CHANGE_LAST_WRITE);
+			break;
+		}
+	}
+}
+
+static void listDirectory(const char * directory) {
 	WIN32_FIND_DATA ffd;
 	HANDLE fHandle;
 
-	markAllForDeletion();
+	watchDirectory(directory);
 
+	const char * directoryQueryString = createDirectoryQueryString(directory);
 	fHandle = FindFirstFile(directoryQueryString, &ffd);
-	if (INVALID_HANDLE_VALUE == fHandle) 
-	{
+	if (INVALID_HANDLE_VALUE == fHandle) {
 		printf("Failed to list directory!\n");
+		return;
 	}
-	do
-	{
-		if (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)
+	do {
+		const char * fullPath;
+		if (ffd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY && 
+			strcmp(ffd.cFileName,".") && 
+			strcmp(ffd.cFileName,"..")) 
 		{
-			//TODO:directory 
+			fullPath = concatDirAndFileName(directory,ffd.cFileName,true);
+			listDirectory(fullPath);
+			free((void*)fullPath);
 		}
-		else if (isLuaFile(ffd.cFileName))
-		{
+		else if (isLuaFile(ffd.cFileName)) {
 			int pos;
-			bool isNew = findFilePosition(&ffd,&pos);
+			fullPath = concatDirAndFileName(directory,ffd.cFileName,false);
+			bool isNew = findFilePosition(fullPath,&pos);
 			if (isNew) {
-				newFileInfoOnPos(&ffd,pos);
+				newFileInfoOnPos(fullPath,&ffd,pos);
 			} 
 			else if (CompareFileTime(&ffd.ftLastWriteTime,&filesInfo[pos]->lastwrite) == 1) {
 				reloadLuaFile(filesInfo[pos]->fileName);
-				filesInfo[pos]->shouldDelete = false;
 				filesInfo[pos]->lastwrite = ffd.ftLastWriteTime;
 			}
+			filesInfo[pos]->shouldDelete = false;
+			free((void*)fullPath);
 		}
 	}
 	while (FindNextFile(fHandle, &ffd) != 0);
 
+	free((void*)directoryQueryString);
+}
+
+static void listProjectDirectory() {
+	markAllForDeletion();
+	listDirectory(baseDirectoryPath);
 	deleteAllMarked();
 }
 
-
-void winhostext_WatchFolder(const char* startupScript) {
-	for(unsigned int i=0; i < SIZE; i++) {
-		filesInfo[i] = NULL;
-	}
-
-	createDirectoryQueryString(startupScript);
-	
-	listProjectDirectory();
-
-	notifyHandle = FindFirstChangeNotification(directoryPath,false,FILE_NOTIFY_CHANGE_LAST_WRITE);
+static void setStartupDir(const char * startupScript ) {
+	size_t dirPathSize = findLastOccuranceOfDirectorySeparator(startupScript);
+	char * temp = (char *) calloc(dirPathSize+2,sizeof(char));
+	strncpy(temp,startupScript,dirPathSize+1);
+	baseDirectoryPath = (const char *) temp;
 }
 
+void winhostext_WatchFolder(const char* startupScript) {
+	for(unsigned int i=0; i < _SIZE; i++) {
+		filesInfo[i] = NULL;
+		notifyHandles[i] = NULL;
+	}
+
+	setStartupDir(startupScript);
+	
+	listProjectDirectory();
+}
 
 static bool safeGuard = true;
 void winhostext_Query() {
-	if (notifyHandle == INVALID_HANDLE_VALUE)
-		return;
 
-	DWORD singleWaitStatus = WaitForSingleObject(notifyHandle,0);
-	if (singleWaitStatus == WAIT_OBJECT_0) {
-		if (FindNextChangeNotification(notifyHandle)) {
-			safeGuard = !safeGuard;
-			if (safeGuard) {
-				listProjectDirectory();
+	for (int i = 0; i<_SIZE; i++) {
+		struct DirInfo * dirInfo = notifyHandles[i];
+
+		if (dirInfo == NULL)
+			break;
+
+		if (dirInfo->notifyHandle == INVALID_HANDLE_VALUE)
+			continue;
+
+		DWORD singleWaitStatus = WaitForSingleObject(dirInfo->notifyHandle,0);
+		if (singleWaitStatus == WAIT_OBJECT_0) {
+			if (FindNextChangeNotification(dirInfo->notifyHandle)) {
+				safeGuard = !safeGuard;
+				if (safeGuard) {
+					listProjectDirectory();
+				}
 			}
+		} else if (singleWaitStatus == WAIT_TIMEOUT) {
+		} else {
+			printf("\n ERROR: Unhandled dwWaitStatus.\n");
 		}
-	} else if (singleWaitStatus == WAIT_TIMEOUT) {
-	} else {
-		printf("\n ERROR: Unhandled dwWaitStatus.\n");
 	}
 }
 
 void winhostext_CleanUp() {
-	for (int i=0; i< SIZE; i++) {
+	for (int i=0; i< _SIZE; i++) {
 		if (filesInfo[i] != NULL)
 			deleteFileInfoOnPos(i);
+
+		if(notifyHandles[i] != NULL) {
+			FindCloseChangeNotification (notifyHandles[i]->notifyHandle);
+			free((void*)notifyHandles[i]->dir);
+			free((void*)notifyHandles[i]);
+		}
+			
 	}
-	
-	FindCloseChangeNotification (notifyHandle);
 
 	free((void*)directoryQueryString);
-	free((void*)directoryPath);
+	free((void*)baseDirectoryPath);
 }
