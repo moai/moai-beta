@@ -58,6 +58,7 @@ namespace GlutInputDeviceSensorID {
 
 static bool sHasWindow = false;
 static bool sExitFullscreen = false;
+static bool sDynamicallyReevaluatsLuaFiles = false;
 
 static int sWinX;
 static int sWinY;
@@ -174,6 +175,7 @@ static void _onTimer ( int millisec ) {
 	#endif
 
 	#ifdef _WINHOSTEXT
+	if (sDynamicallyReevaluatsLuaFiles)
 		winhostext_Query();
 	#endif
 	
@@ -254,7 +256,8 @@ static void _cleanup () {
 	// don't call this on windows; atexit conflict with untz
 	// possible to fix?
 	//AKUClearMemPool ();
-	#ifdef _WINHOSTEXT		
+	#ifdef _WINHOSTEXT
+	if(sDynamicallyReevaluatsLuaFiles)
 		winhostext_CleanUp();
 	#endif
 }
@@ -309,13 +312,23 @@ int GlutHost ( int argc, char** argv ) {
 		AKUDebugHarnessInit ();
 	#endif
 
-	for ( int i = 1; i < argc; ++i ) {
+	
+	#ifdef _WINHOSTEXT
+	int i = 1;
+	if (argv[i][0] == '-' && argv[i][1] == 'e') {
+		sDynamicallyReevaluatsLuaFiles = true;
+		i++;
+	}
+	#endif
+
+	for (i= 1; i < argc; ++i ) {
 		AKURunScript ( argv [ i ]);
 	}
 
 	#ifdef _WINHOSTEXT
-		//assuming that the last script is the entry point we only watch for that directory
-		winhostext_WatchFolder(argv[argc - 1]);
+		//assuming that the last script is the entry point we watch for that directory and its subdirectories
+		if (sDynamicallyReevaluatsLuaFiles)
+			winhostext_WatchFolder(argv[argc - 1]);
 	#endif
 	
 	if ( sHasWindow ) {
