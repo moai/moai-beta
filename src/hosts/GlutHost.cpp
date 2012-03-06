@@ -312,16 +312,15 @@ int GlutHost ( int argc, char** argv ) {
 		AKUDebugHarnessInit ();
 	#endif
 
-	
-	#ifdef _WINHOSTEXT
 	int i = 1;
-	if (argv[i][0] == '-' && argv[i][1] == 'e') {
+	#ifdef _WINHOSTEXT
+	if (argc > 2 && argv[i][0] == '-' && argv[i][1] == 'e') {
 		sDynamicallyReevaluatsLuaFiles = true;
 		i++;
 	}
 	#endif
 
-	for (i= 1; i < argc; ++i ) {
+	for (; i < argc; ++i ) {
 		AKURunScript ( argv [ i ]);
 	}
 
