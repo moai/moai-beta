@@ -87,10 +87,10 @@ static const char * concatDirAndFileName(const char * dir,const char * file,bool
 
 	strcpy(fullPath + directoryPathSize,file);
 	
-	if(trailingSlash) {
+	if(trailingSlash) 
 		fullPath[fullPathSize-2] = '\\';
-		fullPath[fullPathSize-1] = '\0';
-	}
+	fullPath[fullPathSize-1] = '\0';
+
 	return (const char *)fullPath;
 }
 //------------------------------------//
@@ -138,7 +138,7 @@ static void watchDirectory(const char * dir) {
 				break;
 		} else {
 			notifyHandles[i] = (struct DirInfo *)malloc(sizeof(struct DirInfo));
-			notifyHandles[i]->dir = (const char*)calloc(strlen(dir),sizeof(char));
+			notifyHandles[i]->dir = (const char*)calloc(strlen(dir)+1,sizeof(char));
 			strcpy((char*)notifyHandles[i]->dir,dir);
 			notifyHandles[i]->notifyHandle = FindFirstChangeNotification(dir,false,FILE_NOTIFY_CHANGE_LAST_WRITE);
 			break;
@@ -198,6 +198,7 @@ static void setStartupDir(const char * startupScript ) {
 	size_t dirPathSize = findLastOccuranceOfDirectorySeparator(startupScript);
 	char * temp = (char *) calloc(dirPathSize+2,sizeof(char));
 	strncpy(temp,startupScript,dirPathSize+1);
+	temp[dirPathSize+1] = '\0';
 	baseDirectoryPath = (const char *) temp;
 }
 
