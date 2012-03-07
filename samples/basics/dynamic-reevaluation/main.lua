@@ -18,7 +18,7 @@ if not viewport then
 	MOAISim.pushRenderPass ( layer )
 	
 	gfxQuad = MOAIGfxQuad2D.new ()
-	gfxQuad:setTexture ( "C:/Work/moai-beta/samples/basics/anim-basic/cathead.png" )
+	gfxQuad:setTexture ( "cathead.png" )
 	gfxQuad:setRect ( -64, -64, 64, 64 )
 	gfxQuad:setUVRect ( 0, 0, 1, 1 )
 else
