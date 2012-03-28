@@ -53,7 +53,8 @@ int MOAIFacebookIOS::_init ( lua_State* L ) {
 	cc8* appID = state.GetValue < cc8* >( 1, "" );
 	MOAIFacebookIOS::Get ().mAppId = appID;
 	NSString * appIDStr = [[[ NSString alloc] initWithUTF8String: appID ] autorelease ];
-	MOAIFacebookIOS::Get ().mFacebook = [[ Facebook alloc ] initWithAppId: appIDStr andDelegate: MOAIFacebookIOS::Get ().mFBSessionDelegate ];
+	Facebook * fb = [[ Facebook alloc ] initWithAppId: appIDStr andDelegate: MOAIFacebookIOS::Get ().mFBSessionDelegate ];
+	MOAIFacebookIOS::Get ().mFacebook = fb;
 	
 	return 0;
 }
@@ -219,6 +220,7 @@ MOAIFacebookIOS::MOAIFacebookIOS () {
 //----------------------------------------------------------------//
 MOAIFacebookIOS::~MOAIFacebookIOS () {
     
+	[ mFacebook release ];
 	[ mFBDialogDelegate release ];
 	[ mFBSessionDelegate release ];
 }
@@ -346,7 +348,6 @@ void MOAIFacebookIOS::SessionDidNotLogin () {
 	//================================================================//
 
 	- ( void ) fbDidLogin {
-		
 		MOAIFacebookIOS::Get ().SessionDidLogin ();
 	}
 
@@ -364,11 +365,9 @@ void MOAIFacebookIOS::SessionDidNotLogin () {
 	}
 
 	- (void) fbDidLogout {
-		
 	}
 
 	- (void) fbSessionInvalidated {
-		
 	}
 	
 @end
