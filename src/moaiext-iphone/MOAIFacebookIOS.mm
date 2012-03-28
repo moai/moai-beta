@@ -52,8 +52,8 @@ int MOAIFacebookIOS::_init ( lua_State* L ) {
          
 	cc8* appID = state.GetValue < cc8* >( 1, "" );
 	MOAIFacebookIOS::Get ().mAppId = appID;
-	
-	MOAIFacebookIOS::Get ().mFacebook = [[ Facebook alloc ] initWithAppId: [[ NSString alloc ] initWithUTF8String: appID ] andDelegate: MOAIFacebookIOS::Get ().mFBSessionDelegate ];
+	NSString * appIDStr = [[[ NSString alloc] initWithUTF8String: appID ] autorelease ];
+	MOAIFacebookIOS::Get ().mFacebook = [[ Facebook alloc ] initWithAppId: appIDStr andDelegate: MOAIFacebookIOS::Get ().mFBSessionDelegate ];
 	
 	return 0;
 }
