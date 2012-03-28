@@ -21,8 +21,13 @@
 int MOAIFacebookIOS::_getToken ( lua_State* L ) {
 	
 	MOAILuaState state ( L );
-		
-	MOAIFacebookIOS::Get ().mToken = [[ MOAIFacebookIOS::Get ().mFacebook accessToken ] UTF8String ];
+	Facebook * fb = MOAIFacebookIOS::Get ().mFacebook;
+	if ( !fb || ![fb accessToken] ) {
+		lua_pushnil ( L );
+		return 1;
+	}
+
+	MOAIFacebookIOS::Get ().mToken = [[ fb accessToken ] UTF8String ];
 	if ( !MOAIFacebookIOS::Get ().mToken.empty ()) {
 		
 		lua_pushstring ( L, MOAIFacebookIOS::Get ().mToken.c_str ());
