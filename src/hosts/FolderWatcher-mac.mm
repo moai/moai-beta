@@ -19,7 +19,7 @@
 static NSMutableArray* pathsToWatch;
 
 // Which files have been changed so far?
-static OSSpinLock changedFilesLock;
+static pthread_mutex_t changedFilesLock = PTHREAD_MUTEX_INITIALIZER;
 static NSMutableArray* changedFiles;
 
 // How do we figure out if files have been changed?
@@ -77,7 +77,7 @@ static void fseventsCallback(ConstFSEventStreamRef streamRef,
 	// Some files we are interested in have been changed
 	// Record them for processing later
 	
-	OSSpinLockLock(&changedFilesLock);
+	pthread_mutex_lock(&changedFilesLock);
 	
 	for(uint i = 0; i < numEvents; i++)
 	{
@@ -86,7 +86,7 @@ static void fseventsCallback(ConstFSEventStreamRef streamRef,
 	
 	lastEventID = eventIds[numEvents-1];		
 	
-	OSSpinLockUnlock(&changedFilesLock);	
+	pthread_mutex_unlock(&changedFilesLock);	
 }
 
 static void FWUtilStartEventStream()
@@ -241,12 +241,12 @@ char* FWEnumChangedFile(void)
 		
 		// Otherwise... return a single changed file to the caller
 		
-		OSSpinLockLock(&changedFilesLock);
+		pthread_mutex_lock(&changedFilesLock);
 		
 		char* path = strdup([[changedFiles objectAtIndex: 0] UTF8String]);
 		[changedFiles removeObjectAtIndex: 0];
 		
-		OSSpinLockUnlock(&changedFilesLock);
+		pthread_mutex_unlock(&changedFilesLock);
 		
 		return path;
 	}
