@@ -6,7 +6,6 @@
 #include <moaicore/MOAIImage.h>
 
 extern "C" {
-	#include <jinclude.h>
 	#include <jpeglib.h>
 	#include <jerror.h>
 }
