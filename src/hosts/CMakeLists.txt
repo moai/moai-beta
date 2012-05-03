@@ -8,7 +8,8 @@ target_link_libraries(gluthost
     moaicore
     utf8
     jansson
-    glut
+    ${OPENGL_LIBRARIES}
+    ${GLUT_LIBRARIES}
     GLEW
 )
 

@@ -2,6 +2,8 @@ find_package(Lua51 REQUIRED)
 find_package(CURL REQUIRED)
 find_package(Freetype REQUIRED)
 find_package(ZLIB REQUIRED)
+find_package(OpenGL REQUIRED)
+find_package(GLUT REQUIRED)
 
 include_directories(
     ${MOAI_SOURCE_DIR}/3rdparty
@@ -16,6 +18,9 @@ include_directories(
     ${MOAI_SOURCE_DIR}/src/zipfs
 
     ${FREETYPE_INCLUDE_DIRS}
+    ${CURL_INCLUDE_DIRS}
+    ${OPENGL_INCLUDE_DIRS}
+    ${GLUT_INCLUDE_DIRS}
 )
 
 link_directories(
