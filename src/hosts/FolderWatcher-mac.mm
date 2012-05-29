@@ -10,6 +10,28 @@
 #import <CoreServices/CoreServices.h>
 
 
+/*-------------------------------------------------------------------
+ * XCode 3 / LLVM <3.0 compatibility macros
+ --------------------------------------------------------------------*/
+#ifdef __llvm__
+  #ifdef __has_feature(objc_arc)
+    #define ARC_POOL_START @autoreleasepool {
+  #else
+    #define ARC_POOL_START NSAutoreleasePool *pool = [NSAutoreleasePool new];
+  #endif
+#else
+  #define ARC_POOL_START NSAutoreleasePool *pool = [NSAutoreleasePool new];
+#endif
+
+#ifdef __llvm__
+  #ifdef __has_feature(objc_arc)
+    #define ARC_POOL_END }
+  #else
+    #define ARC_POOL_END [pool drain];
+  #endif
+#else
+  #define ARC_POOL_END [pool drain];
+#endif
 
 /*-------------------------------------------------------------------
  FolderWatch API implementation
@@ -143,13 +165,13 @@ static void FWUtilStopEventStream()
 
 static void* FWWatchThreadMain(void*)
 {
-	@autoreleasepool{
+    ARC_POOL_START
 		
 		FWUtilStartEventStream();
 		threadStateReadyToBeStopped = true;
 		CFRunLoopRun();
 		
-	}
+    ARC_POOL_END
 	
 	return 0;
 }
@@ -177,8 +199,7 @@ void FWStart(const char* path)
 	if(!path)
 		return;
 	
-	@autoreleasepool
-	{	
+    ARC_POOL_START
 		FWLazyInit();
 
 		NSString* newPath = [NSString stringWithUTF8String: path];
@@ -196,7 +217,7 @@ void FWStart(const char* path)
 		
 		FWUtilStopEventStream();	// Also causes thread to stop running
 		FWStartWatcherThread();
-	}
+    ARC_POOL_END
 }
 
 void FWStop(const char* path)
@@ -204,8 +225,7 @@ void FWStop(const char* path)
 	if(!path)
 		return;
 	
-	@autoreleasepool 
-	{
+    ARC_POOL_START
 		FWLazyInit();
 		
 		NSString* pathToRemove = [NSString stringWithUTF8String:path];
@@ -213,25 +233,23 @@ void FWStop(const char* path)
 		
 		FWUtilStopEventStream();
 		FWStartWatcherThread();
-	}
+    ARC_POOL_END
 }
 
 void FWStopAll(void)
 {
-	@autoreleasepool 
-	{
+    ARC_POOL_START
 		FWLazyInit();
 		
 		FWUtilStopEventStream();
 		
 		[pathsToWatch removeAllObjects];
-	}
+    ARC_POOL_END
 }
 
 char* FWEnumChangedFile(void)
 {
-	@autoreleasepool 
-	{
+    ARC_POOL_START
 		FWLazyInit();
 		
 		// Is there anything in the changed files array?
@@ -249,7 +267,7 @@ char* FWEnumChangedFile(void)
 		OSSpinLockUnlock(&changedFilesLock);
 		
 		return path;
-	}
+    ARC_POOL_END
 }
 
 /*-------------------------------------------------------------------
