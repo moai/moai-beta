@@ -13,6 +13,18 @@
 //================================================================//
 
 //----------------------------------------------------------------//
+/**	@name	extendToken
+ @text	Extends the life of an active token. Should be called on app resume/start.
+ 
+ @out	nil
+ */
+int MOAIFacebookIOS::_extendToken ( lua_State* L ) {
+	
+	[ MOAIFacebookIOS::Get ().mFacebook extendAccessTokenIfNeeded ];
+	return 0;
+}
+
+//----------------------------------------------------------------//
 /**	@name	getToken
 	@text	Retrieve the Facebook login token.
 				
@@ -35,6 +47,50 @@ int MOAIFacebookIOS::_getToken ( lua_State* L ) {
 }
 
 //----------------------------------------------------------------//
+/**	@name	getExpirationDate
+	@text	Retrieve the Facebook login token expiration date.
+				
+	@out	string	token expiration date
+*/
+int MOAIFacebookIOS::_getExpirationDate ( lua_State* L ) {
+	
+	MOAILuaState state ( L );
+	
+	NSDateFormatter *formatter = [[ NSDateFormatter alloc ] init ];
+	[ formatter setDateFormat:@"dd-MM-yyyy HH:mm:ss" ];
+	NSString *dateString = [ formatter stringFromDate:[ MOAIFacebookIOS::Get ().mFacebook expirationDate ]];
+	[ formatter release ];
+	
+	MOAIFacebookIOS::Get ().mExpirationDate = [ dateString UTF8String ];
+	if ( !MOAIFacebookIOS::Get ().mExpirationDate.empty ()) {
+		lua_pushstring ( L, MOAIFacebookIOS::Get ().mExpirationDate.c_str ());
+	} else {
+		
+		lua_pushnil ( L );
+	}
+	
+	return 1;
+}
+
+
+//----------------------------------------------------------------//
+/**	@name	graphRequest
+ @text	Make a request on Facebook's Graph API
+ 
+ @in	string	path
+ @out	nil
+ */
+int MOAIFacebookIOS::_graphRequest ( lua_State* L ) {
+	
+	MOAILuaState state ( L );
+	cc8* path = state.GetValue < cc8* >( 1, "" );
+	NSString* nsPath = [[[ NSString alloc ] initWithUTF8String:path ] autorelease ];
+	[ MOAIFacebookIOS::Get ().mFacebook requestWithGraphPath:nsPath andDelegate:MOAIFacebookIOS::Get ().mFBRequestDelegate ];	
+	
+	return 0;
+}
+
+//----------------------------------------------------------------//
 /**	@name	init
 	@text	Initialize Facebook.
 				
@@ -47,8 +103,8 @@ int MOAIFacebookIOS::_init ( lua_State* L ) {
          
 	cc8* appID = state.GetValue < cc8* >( 1, "" );
 	MOAIFacebookIOS::Get ().mAppId = appID;
-	
-	MOAIFacebookIOS::Get ().mFacebook = [[ Facebook alloc ] initWithAppId: [[ NSString alloc ] initWithUTF8String: appID ] andDelegate: MOAIFacebookIOS::Get ().mFBSessionDelegate ];
+	NSString *app = [[[ NSString alloc ] initWithUTF8String: appID ] autorelease ];
+	MOAIFacebookIOS::Get ().mFacebook = [[ Facebook alloc ] initWithAppId:app  andDelegate: MOAIFacebookIOS::Get ().mFBSessionDelegate ];
 	
 	return 0;
 }
@@ -66,7 +122,7 @@ int MOAIFacebookIOS::_login ( lua_State* L ) {
 	
 	if ( state.IsType ( 1, LUA_TTABLE )) {
 		
-		NSMutableDictionary* paramsDict = [[ NSMutableDictionary alloc ] init ];
+		NSMutableDictionary* paramsDict = [ NSMutableDictionary dictionary ];
 		[ paramsDict initWithLua:state stackIndex:1 ];
 		
 		NSArray* paramsArray = [ paramsDict allValues ];
@@ -118,14 +174,14 @@ int MOAIFacebookIOS::_postToFeed ( lua_State* L ) {
 	
 	MOAILuaState state ( L );
 	
-	NSString* link = [[ NSString alloc ] initWithUTF8String:state.GetValue < cc8* >( 1, "" ) ];
-	NSString* pic = [[ NSString alloc ] initWithUTF8String:state.GetValue < cc8* >( 2, "" ) ];
-	NSString* name = [[ NSString alloc ] initWithUTF8String:state.GetValue < cc8* >( 3, "" ) ];
-	NSString* caption = [[ NSString alloc ] initWithUTF8String:state.GetValue < cc8* >( 4, "" ) ];
-	NSString* desc = [[ NSString alloc ] initWithUTF8String:state.GetValue < cc8* >( 5, "" ) ];
-	NSString* msg = [[ NSString alloc ] initWithUTF8String:state.GetValue < cc8* >( 6, "" ) ];
+	NSString* link = [[[ NSString alloc ] initWithUTF8String:state.GetValue < cc8* >( 1, "" ) ] autorelease ];
+	NSString* pic = [[[ NSString alloc ] initWithUTF8String:state.GetValue < cc8* >( 2, "" ) ] autorelease ];
+	NSString* name = [[[ NSString alloc ] initWithUTF8String:state.GetValue < cc8* >( 3, "" ) ] autorelease ];
+	NSString* caption = [[[ NSString alloc ] initWithUTF8String:state.GetValue < cc8* >( 4, "" ) ] autorelease ];
+	NSString* desc = [[[ NSString alloc ] initWithUTF8String:state.GetValue < cc8* >( 5, "" ) ] autorelease ];
+	NSString* msg = [[[ NSString alloc ] initWithUTF8String:state.GetValue < cc8* >( 6, "" ) ] autorelease ];
 	
-	NSString* appId = [[ NSString alloc ] initWithUTF8String:MOAIFacebookIOS::Get ().mAppId.c_str() ];
+	NSString* appId = [[[ NSString alloc ] initWithUTF8String:MOAIFacebookIOS::Get ().mAppId.c_str() ] autorelease ];
 	
 	NSMutableDictionary* params = [ NSMutableDictionary dictionaryWithObjectsAndKeys:
 									 appId, @"app_id",
@@ -153,7 +209,7 @@ int MOAIFacebookIOS::_sendRequest ( lua_State* L ) {
 	
 	MOAILuaState state ( L );
 	
-	NSString* msg = [[ NSString alloc ] initWithUTF8String:state.GetValue < cc8* >( 1, "" ) ];
+	NSString* msg = [[[ NSString alloc ] initWithUTF8String:state.GetValue < cc8* >( 1, "" ) ] autorelease ];
 	
 	NSMutableDictionary* params = [ NSMutableDictionary dictionaryWithObjectsAndKeys: msg, @"message", nil ];
 	
@@ -196,6 +252,32 @@ int MOAIFacebookIOS::_setToken ( lua_State* L ) {
 	
 	return 0;
 }
+
+//----------------------------------------------------------------//
+/**	@name	setExpirationDate
+	@text	Set the Facebook login token expiration date.
+			
+	@in		string	expirationDate			The login token expiration date. See Facebook documentation.
+	@out 	nil
+*/
+int MOAIFacebookIOS::_setExpirationDate ( lua_State* L ) {
+	
+	MOAILuaState state ( L );
+	
+	cc8* expirationDate = state.GetValue < cc8* >( 1, "" );
+	
+	NSString *dateString = [[ NSString alloc ] initWithUTF8String:expirationDate ];
+	NSDateFormatter *formatter = [[ NSDateFormatter alloc ] init ];
+	[ formatter setDateFormat:@"dd-MM-yyyy HH:mm:ss" ];
+	NSDate *date = [ formatter dateFromString:dateString ];
+	[ dateString release ];
+	[ formatter release ];
+	
+	MOAIFacebookIOS::Get ().mExpirationDate = expirationDate;
+	MOAIFacebookIOS::Get ().mFacebook.expirationDate = date;
+	
+	return 0;
+}
 	
 //================================================================//
 // MOAIFacebookIOS
@@ -208,6 +290,7 @@ MOAIFacebookIOS::MOAIFacebookIOS () {
 	RTTI_SINGLE ( MOAIGlobalEventSource )	
 	
 	mFBDialogDelegate = [[ MOAIFacebookIOSDialogDelegate alloc ] init ];
+	mFBRequestDelegate = [[ MOAIFacebookIOSRequestDelegate alloc ] init ];
 	mFBSessionDelegate = [[ MOAIFacebookIOSSessionDelegate alloc ] init ];
 }
 
@@ -216,6 +299,7 @@ MOAIFacebookIOS::~MOAIFacebookIOS () {
     
 	[ mFacebook release ];
 	[ mFBDialogDelegate release ];
+	[ mFBRequestDelegate release ];
 	[ mFBSessionDelegate release ];
 }
 
@@ -224,19 +308,24 @@ void MOAIFacebookIOS::RegisterLuaClass ( MOAILuaState& state ) {
     
 	state.SetField ( -1, "DIALOG_DID_COMPLETE", 	( u32 )DIALOG_DID_COMPLETE );
 	state.SetField ( -1, "DIALOG_DID_NOT_COMPLETE",	( u32 )DIALOG_DID_NOT_COMPLETE );
+	state.SetField ( -1, "REQUEST_RESPONSE", 		( u32 )REQUEST_RESPONSE );
 	state.SetField ( -1, "SESSION_DID_LOGIN", 		( u32 )SESSION_DID_LOGIN );
 	state.SetField ( -1, "SESSION_DID_NOT_LOGIN", 	( u32 )SESSION_DID_NOT_LOGIN );
 	
 	luaL_Reg regTable[] = {
-		{ "getToken",		_getToken },
-		{ "init",			_init },
-		{ "login",			_login },
-		{ "logout",			_logout },
-		{ "postToFeed",		_postToFeed },
-		{ "sendRequest",	_sendRequest },
-		{ "sessionValid",	_sessionValid },
-		{ "setListener",	&MOAIGlobalEventSource::_setListener < MOAIFacebookIOS > },
-		{ "setToken",		_setToken },
+		{ "extendToken",		_extendToken },
+		{ "getToken",			_getToken },
+		{ "getExpirationDate",	_getExpirationDate },
+		{ "graphRequest",		_graphRequest },
+		{ "init",				_init },
+		{ "login",				_login },
+		{ "logout",				_logout },
+		{ "postToFeed",			_postToFeed },
+		{ "sendRequest",		_sendRequest },
+		{ "sessionValid",		_sessionValid },
+		{ "setListener",		&MOAIGlobalEventSource::_setListener < MOAIFacebookIOS > },
+		{ "setToken",			_setToken },
+		{ "setExpirationDate",	_setExpirationDate },
 		{ NULL, NULL }	
 	};
     
@@ -269,6 +358,18 @@ void MOAIFacebookIOS::DialogDidComplete ( ) {
 void MOAIFacebookIOS::HandleOpenURL ( NSURL* url ) {
 	
 	[ mFacebook handleOpenURL:url ];
+}
+
+//----------------------------------------------------------------//
+void MOAIFacebookIOS::ReceivedRequestResponse ( cc8* response ) {
+	
+	MOAILuaStateHandle state = MOAILuaRuntime::Get ().State ();
+	
+	if ( this->PushListener ( REQUEST_RESPONSE, state )) {
+
+		state.Push ( response );
+		state.DebugCall ( 1, 0 );
+	}
 }
 
 //----------------------------------------------------------------//
@@ -328,6 +429,25 @@ void MOAIFacebookIOS::SessionDidNotLogin () {
 
 		MOAIFacebookIOS::Get ().DialogDidNotComplete ();
 	}
+
+@end
+
+//================================================================//
+// MOAIFacebookIOSRequestDelegate
+//================================================================//
+@implementation MOAIFacebookIOSRequestDelegate
+
+//================================================================//
+#pragma mark -
+#pragma mark Protocol MOAIFacebookIOSRequestDelegate
+//================================================================//
+
+- ( void )request:( FBRequest* )request didLoadRawResponse:( NSData * )data {
+
+	cc8* jsonResponse = ( cc8* ) data.bytes;
+	
+	MOAIFacebookIOS::Get ().ReceivedRequestResponse ( jsonResponse );
+}
 
 @end
 
