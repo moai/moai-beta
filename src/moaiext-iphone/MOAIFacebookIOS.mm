@@ -57,7 +57,7 @@ int MOAIFacebookIOS::_getExpirationDate ( lua_State* L ) {
 	MOAILuaState state ( L );
 	
 	NSDateFormatter *formatter = [[ NSDateFormatter alloc ] init ];
-	[ formatter setDateFormat:@"dd-MM-yyyy" ];
+	[ formatter setDateFormat:@"dd-MM-yyyy HH:mm:ss" ];
 	NSString *dateString = [ formatter stringFromDate:[ MOAIFacebookIOS::Get ().mFacebook expirationDate ]];
 	[ formatter release ];
 	
@@ -268,7 +268,7 @@ int MOAIFacebookIOS::_setExpirationDate ( lua_State* L ) {
 	
 	NSString *dateString = [[ NSString alloc ] initWithUTF8String:expirationDate ];
 	NSDateFormatter *formatter = [[ NSDateFormatter alloc ] init ];
-	[ formatter setDateFormat:@"dd-MM-yyyy" ];
+	[ formatter setDateFormat:@"dd-MM-yyyy HH:mm:ss" ];
 	NSDate *date = [ formatter dateFromString:dateString ];
 	[ dateString release ];
 	[ formatter release ];
